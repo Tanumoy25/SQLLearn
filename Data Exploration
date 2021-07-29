@@ -1,0 +1,222 @@
+Commands: docker-compose up
+
+ http://localhost:3000 
+
+POINTS:
+
+1. One more thing about NULL values also - by default PostgreSQL will put all null values last unless specified with a NULLS FIRST.
+2. Try to use control-f on Windows or command-f on MacOS to quickly highlight all of your commas so you can inspect them carefully.
+3. PostgreSQL does not allow for this style of COUNT(DISTINCT *) syntax
+
+Problems:
+--------------------SELECT AND SORT DATA-----------------------------
+---- What is the name of the category with the highest category_id in the dvd_rentals.category table?
+
+SELECT name,category_id from dvd_rentals.category order by category_id desc limit 1
+
+---- For the films with the longest length, what is the title of the “R” rated film with the lowest replacement_cost in dvd_rentals.film table?
+
+SELECT 
+  title,
+  replacement_cost,
+  length,
+  rating 
+  from dvd_rentals.film where rating = 'R' order by length desc, replacement_cost limit 5;
+  
+---- Who was the manager of the store with the highest total_sales in the dvd_rentals.sales_by_store table?
+
+SELECT * from dvd_rentals.sales_by_store order by total_sales desc limit 1;
+
+---- What is the postal_code of the city with the 5th highest city_id in the dvd_rentals.address table?
+
+-------------------------------RECORD COUNTS AND DISTINCT VALUES--------------------------------------
+Select a.postal_code,a.city_id from (SELECT postal_code,city_id FROM dvd_rentals.address order by city_id desc limit 5)a order by a.postal_code limit 1;
+
+---- Which actor_id has the most number of unique film_id records in the dvd_rentals.film_actor table?
+
+SELECT actor_id,COUNT(DISTINCT film_id) from dvd_rentals.film_actor GROUP BY actor_id order by count desc limit 1;
+
+---- How many unique country_id values exist in the dvd_rentals.city table?
+
+Select count(distinct country_id) as unique_countries from dvd_rentals.city;
+
+---- How many distinct fid values are there for the 3rd most common price value in the dvd_rentals.nicer_but_slower_film_list table?
+
+SELECT a.unique_fid,a.price from
+(select count(DISTINCT fid) as unique_fid,price from dvd_rentals.nicer_but_slower_film_list group by price order by unique_fid desc limit 3)a 
+order by a.unique_fid limit 1
+
+---- What percentage of overall total_sales does the Sports category make up in the dvd_rentals.sales_by_film_category table?
+
+SELECT
+  category,
+  ROUND(
+    100 * total_sales::NUMERIC / SUM(total_sales) OVER (),
+    2
+  ) AS percentage
+FROM dvd_rentals.sales_by_film_category;
+
+---- What percentage of unique fid values are in the Children category in the dvd_rentals.film_list table?
+
+SELECT
+  category,
+  ROUND(
+    100 * COUNT(DISTINCT fid)::NUMERIC / SUM(COUNT(DISTINCT fid)) OVER (),
+    2
+  ) AS percentage
+FROM dvd_rentals.film_list
+GROUP BY category
+ORDER BY category;
+
+------------------------------IDENTIFYING DUPLICATE RECORDS--------------------
+---- Which id value has the most number of duplicate records in the health.user_logs table?
+
+WITH groupby_counts AS (
+  SELECT
+    id,
+    log_date,
+    measure,
+    measure_value,
+    systolic,
+    diastolic,
+    COUNT(*) AS frequency
+  FROM health.user_logs
+  GROUP BY
+    id,
+    log_date,
+    measure,
+    measure_value,
+    systolic,
+    diastolic
+)
+SELECT
+  id,
+  SUM(frequency) AS total_duplicate_rows
+FROM groupby_counts
+WHERE frequency > 1
+GROUP BY id
+ORDER BY total_duplicate_rows DESC
+LIMIT 1;
+
+---- Which log_date value had the most duplicate records after removing the max duplicate id value from question 1?
+
+WITH groupby_counts AS (
+  SELECT
+    id,
+    log_date,
+    measure,
+    measure_value,
+    systolic,
+    diastolic,
+    COUNT(*) AS frequency
+  FROM health.user_logs
+  WHERE id != '054250c692e07a9fa9e62e345231df4b54ff435d'
+  GROUP BY
+    id,
+    log_date,
+    measure,
+    measure_value,
+    systolic,
+    diastolic
+)
+SELECT
+  log_date,
+  SUM(frequency) AS total_duplicate_rows
+FROM groupby_counts
+WHERE frequency > 1
+GROUP BY log_date
+ORDER BY total_duplicate_rows DESC
+LIMIT 1;
+
+---- Which measure_value had the most occurences in the health.user_logs value when measure = 'weight'?
+
+SELECT
+  measure_value,
+  COUNT(*) AS frequency
+FROM health.user_logs
+WHERE measure = 'weight'
+GROUP BY measure_value
+ORDER BY frequency DESC
+LIMIT 1;
+
+---- How many single duplicated rows exist when measure = 'blood_pressure' in the health.user_logs?
+How about the total number of duplicate records in the same table?
+
+WITH groupby_counts AS (
+  SELECT
+    id,
+    log_date,
+    measure,
+    measure_value,
+    systolic,
+    diastolic,
+    COUNT(*) AS frequency
+  FROM health.user_logs
+  WHERE measure = 'blood_pressure'
+  GROUP BY
+    id,
+    log_date,
+    measure,
+    measure_value,
+    systolic,
+    diastolic
+)
+SELECT
+  COUNT(*) as single_duplicate_rows,
+  SUM(frequency) as total_duplicate_records
+FROM groupby_counts
+WHERE frequency > 1;
+
+---- What percentage of records measure_value = 0 when measure = 'blood_pressure' in the health.user_logs table?
+How many records are there also for this same condition?
+
+WITH all_measure_values AS (
+  SELECT
+    measure_value,
+    COUNT(*) AS total_records,
+    SUM(COUNT(*)) OVER () AS overall_total
+  FROM health.user_logs
+  WHERE measure = 'blood_pressure'
+  GROUP BY 1
+)
+SELECT
+  measure_value,
+  total_records,
+  overall_total,
+  ROUND(100 * total_records::NUMERIC / overall_total, 2) AS percentage
+FROM all_measure_values
+WHERE measure_value = 0;
+
+---- What percentage of records are duplicates in the health.user_logs table?
+
+WITH groupby_counts AS (
+  SELECT
+    id,
+    log_date,
+    measure,
+    measure_value,
+    systolic,
+    diastolic,
+    COUNT(*) AS frequency
+  FROM health.user_logs
+  GROUP BY
+    id,
+    log_date,
+    measure,
+    measure_value,
+    systolic,
+    diastolic
+)
+SELECT
+  -- Need to subtract 1 from the frequency to count actual duplicates!
+  -- Also don't forget about the integer floor division!
+  ROUND(
+    100 * SUM(CASE
+        WHEN frequency > 1 THEN frequency - 1
+        ELSE 0 END
+    )::NUMERIC / SUM(frequency),
+    2
+  ) AS duplicate_percentage
+FROM groupby_counts;
+
+----------------SUMMARY STATISTICS---------------
