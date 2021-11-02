@@ -248,3 +248,5 @@ WHERE measure = 'blood_glucose'
 GROUP BY 1
 ORDER BY 2 DESC
 LIMIT 10;
+
+--the NTILE window function is used to perform the assignment of numbers 1 through 100 for each row in the records for each measure_value
