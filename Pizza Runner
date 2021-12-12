@@ -1,0 +1,46 @@
+Select count(*) from pizza_runner.customer_orders;
+
+Select count(distinct order_id) from pizza_runner.customer_orders;
+
+Select runner_id, count(order_id) as successful_orders from 
+pizza_runner.runner_orders
+where distance!=0 group by runner_id;
+
+Select pizza_name,count(co.pizzA_id)
+from pizza_runner.customer_orders co join pizza_runner.runner_orders ro
+on co.order_id=ro.order_id join pizza_runner.pizza_names pn 
+on co.pizza_id=pn.pizza_id
+where ro.distance!=0
+group by pn.pizza_name;
+
+Select co.customer_id, p.pizza_name, count(p.pizza_name) 
+from pizza_runner.customer_orders co join pizza_runner.pizza_names p
+on co.pizza_id=p.pizza_id group by co.customer_id, p.pizza_name 
+order by customer_id asc;
+
+with pizza_cnt as (Select c.order_id, count(c.pizza_id) as pizza_order
+FROM pizza_runner.customer_orders AS c
+  JOIN pizza_runner.runner_orders AS r
+    ON c.order_id = r.order_id
+  WHERE r.distance != 0
+  GROUP BY c.order_id
+)
+select order_id, max(pizza_order) as pizza_per_order from pizza_cnt
+
+Select c.customer_id, sum(case when c.exclusions <> ' ' or c.extras <> ' ' THEN 1
+ELSE 0 END) AS at_least_1_change,
+sum(case when c.exclusions = ' ' and c.extras=' ' THEN 1 ELSE 0 End) AS no_change
+FROM pizza_runner.customer_orders AS c
+  JOIN pizza_runner.runner_orders AS r
+  ON c.order_id = r.order_id
+  WHERE r.distance != 0
+  GROUP BY c.customer_id
+  order by c.customer_id
+  
+Select sum(case when exclusions IS NOT NULL and extras IS NOT NULL THEN 1 ELSE 0 END)
+As pizza_count_w_exclusions_extras from pizza_runner.customer_orders AS c
+  JOIN pizza_runner.runner_orders AS r on c.order_id=r.order_id
+  where r.distance>=1 and exclusions <> ' ' and extras <> ' '
+  
+Select DATE_PART('HOUR', order_time) as hour_of_day,count(order_id) as pizza_count
+from pizza_runner.customer_orders group by DATE_PART('HOUR',order_time)
